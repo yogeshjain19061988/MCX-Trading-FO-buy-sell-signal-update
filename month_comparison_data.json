@@ -1,0 +1,10 @@
+{
+  "day_open_prices": {
+    "NATURALGAS_day_open": {
+      "current_month": 100.0,
+      "next_month": 101.0,
+      "timestamp": "20:05:09"
+    }
+  },
+  "day_start_time": "09:00"
+}

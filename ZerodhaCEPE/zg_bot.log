@@ -1,0 +1,153 @@
+2025-10-09 09:56:04,217 ERROR: No access token found. Run generate_request_token() and then generate_access_token_from_request_token(request_token).
+2025-10-09 09:56:44,872 ERROR: No access token found. Run generate_request_token() and then generate_access_token_from_request_token(request_token).
+2025-10-09 09:56:58,431 ERROR: No access token found. Run generate_request_token() and then generate_access_token_from_request_token(request_token).
+2025-10-09 10:01:56,279 ERROR: No access token found. Run generate_request_token() and then generate_access_token_from_request_token(request_token).
+2025-10-09 10:02:25,085 ERROR: No access token found. Run generate_request_token() and then generate_access_token_from_request_token(request_token).
+2025-10-09 10:03:15,206 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 136, in get_ltp
+    ltp_data = kite.ltp(instrument)
+               ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:03:40,775 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 136, in get_ltp
+    ltp_data = kite.ltp(instrument)
+               ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:03:47,610 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 136, in get_ltp
+    ltp_data = kite.ltp(instrument)
+               ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:04:52,849 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 136, in get_ltp
+    ltp_data = kite.ltp(instrument)
+               ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:05:17,798 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 136, in get_ltp
+    ltp_data = kite.ltp(instrument)
+               ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yogejain\AppData\Local\miniforge3\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:10:51,182 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 136, in get_ltp
+    ltp_data = kite.ltp(instrument)
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:12:09,895 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 136, in get_ltp
+    ltp_data = kite.ltp(instrument)
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:13:14,802 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 146, in get_ltp
+    ltp_data = kite.ltp(instrument)
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:13:24,743 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 146, in get_ltp
+    ltp_data = kite.ltp(instrument)
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:13:55,880 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 146, in get_ltp
+    ltp_data = kite.ltp(instrument)
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
+2025-10-09 10:15:14,608 ERROR: Failed to fetch LTP for NATGAS24OCT270CE: Incorrect `api_key` or `access_token`.
+Traceback (most recent call last):
+  File "D:\ZerodhaCEPE\main.py", line 147, in get_ltp
+    ltp_data = kite.ltp(instrument)
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 611, in ltp
+    return self._get("market.quote.ltp", params={"i": ins})
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 861, in _get
+    return self._request(route, "GET", url_args=url_args, params=params, is_json=is_json)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ZerodhaCEPE\.venv\Lib\site-packages\kiteconnect\connect.py", line 937, in _request
+    raise exp(data["message"], code=r.status_code)
+kiteconnect.exceptions.TokenException: Incorrect `api_key` or `access_token`.
