@@ -11,7 +11,6 @@ import webbrowser
 from threading import Thread, Event
 import calendar
 from dateutil.relativedelta import relativedelta
-import math
 
 class ZerodhaTradingApp:
     def __init__(self, root):
@@ -135,8 +134,6 @@ class ZerodhaTradingApp:
             if self.kite and self.is_logged_in:
                 # Get all instruments
                 all_instruments = self.kite.instruments("MCX")
-                print(all_instruments)
-                #all_instruments.append(["GOLD", "SILVER", "CRUDEOIL", "NATURALGAS", "COPPER", "LEAD", "ZINC", "ALUMINIUM", "NICKEL"])  # Also load NFO for options
                 self.instruments_df = pd.DataFrame(all_instruments)
                 
                 # Convert expiry to datetime if it's string
@@ -203,9 +200,9 @@ class ZerodhaTradingApp:
         """Get available MCX symbols from instruments"""
         try:
             if self.instruments_df is None:
-                self.load_instruments()
-                # if self.instruments_df is None:
-                #     return ["GOLD", "SILVER", "CRUDEOIL", "NATURALGAS", "COPPER", "LEAD", "ZINC", "ALUMINIUM", "NICKEL"]
+                #self.load_instruments()
+                if self.instruments_df is None:
+                    return ["GOLD", "SILVER", "CRUDEOIL", "NATURALGAS", "COPPER", "LEAD", "ZINC", "ALUMINIUM", "NICKEL"]
             
             # Get unique base symbols from MCX instruments
             mcx_instruments = self.instruments_df[self.instruments_df['exchange'] == 'MCX']
@@ -287,10 +284,8 @@ class ZerodhaTradingApp:
         try:
             if self.instruments_df is None:
                 self.load_instruments()
-                # if self.instruments_df is None:
-                #     return []
                 if self.instruments_df is None:
-                    return ["GOLD", "SILVER", "CRUDEOIL", "NATURALGAS", "COPPER", "LEAD", "ZINC", "ALUMINIUM", "NICKEL"]
+                    return []
             
             # Filter only futures contracts
             futures_df = self.instruments_df[
@@ -694,8 +689,8 @@ class ZerodhaTradingApp:
         self.setup_ce_pe_options_tab(notebook)
         # ==================================
         
-        # Position Exit Tab
-        self.setup_position_exit_tab(notebook)
+        self.setup_limit_settings_tab(notebook)
+
         self.setup_positions_tab(notebook)
         
         # P&L Tab
@@ -2445,11 +2440,9 @@ class ZerodhaTradingApp:
                 if order_type == "LIMIT":
                     if price == 0:  # No price specified, use current LTP with offset
                         if transaction == "BUY":
-                            #final_price = current_price * 0.995  # 0.5% below LTP
-                            final_price = math.ceil(current_price / 0.5) * 0.5
+                            final_price = current_price * 0.995  # 0.5% below LTP
                         else:
-                            #final_price = current_price * 1.005  # 0.5% above LTP
-                            final_price = math.floor(current_price / 0.5) * 0.5
+                            final_price = current_price * 1.005  # 0.5% above LTP
                     else:
                         final_price = price  # Use user-specified price
                     
@@ -2636,11 +2629,9 @@ class ZerodhaTradingApp:
                 if order_type == "LIMIT":
                     if price == 0:  # No price specified, use current LTP with offset
                         if transaction == "BUY":
-                            #final_price = current_price * 0.995  # 0.5% below LTP
-                            final_price = math.ceil(current_price / 0.5) * 0.5
+                            final_price = current_price * 0.995  # 0.5% below LTP
                         else:
-                            final_price = math.floor(current_price / 0.5) * 0.5
-                            #final_price = current_price * 1.005  # 0.5% above LTP
+                            final_price = current_price * 1.005  # 0.5% above LTP
                     else:
                         final_price = price  # Use user-specified price
                     
@@ -3761,14 +3752,10 @@ class ZerodhaTradingApp:
         # Start protection status updates
         threading.Thread(target=self.update_protection_status_loop, daemon=True).start()
         
-
-        # Start exit positions updates
-        threading.Thread(target=self.update_exit_positions_loop, daemon=True).start()
         # Auto-refresh tables after login
         if self.is_logged_in:
             self.root.after(2000, self.refresh_futures_table)  # Refresh futures after 2 seconds
             self.root.after(3000, self.refresh_options_table_month)  # Refresh options after 3 seconds
-            self.root.after(4000, self.refresh_exit_positions)  # Refresh exit positions after 4 seconds
     
     def update_positions_loop(self):
         """Continuously update positions"""
@@ -4857,7 +4844,7 @@ class ZerodhaTradingApp:
                 time.sleep(10)
 
     def place_ce_single_order(self):
-        """Place order for selected CE contracts"""
+        """Place order for selected CE contracts with auto limit price"""
         if not self.is_logged_in:
             messagebox.showerror("Error", "Please login first")
             return
@@ -4871,7 +4858,11 @@ class ZerodhaTradingApp:
             order_type = self.cepe_order_type.get()
             quantity_type = self.cepe_quantity_type.get()
             base_quantity = int(self.cepe_quantity_entry.get())
-            price = float(self.cepe_price_entry.get()) if self.cepe_price_entry.get() and float(self.cepe_price_entry.get()) > 0 else 0
+            
+            # Get user price (if specified)
+            user_price = 0
+            if self.cepe_price_entry.get():
+                user_price = float(self.cepe_price_entry.get())
             
             # Check protection
             self.update_daily_pnl()
@@ -4891,8 +4882,9 @@ class ZerodhaTradingApp:
             # Start real-time price updates
             self.start_price_updates_for_order(symbols)
             
-            # Show real-time price window
-            self.show_ce_real_time_price_window(symbols, transaction, order_type, quantity_type, base_quantity, price)
+            # Show real-time price window with auto limit info
+            self.show_ce_real_time_price_window(symbols, transaction, order_type, 
+                                               quantity_type, base_quantity, user_price)
             
         except ValueError as e:
             messagebox.showerror("Error", "Please enter valid quantity and price values")
@@ -4900,7 +4892,7 @@ class ZerodhaTradingApp:
             self.log_cepe_message(f"Error starting CE order placement: {e}")
     
     def place_pe_single_order(self):
-        """Place order for selected PE contracts"""
+        """Place order for selected PE contracts with auto limit price"""
         if not self.is_logged_in:
             messagebox.showerror("Error", "Please login first")
             return
@@ -4914,7 +4906,11 @@ class ZerodhaTradingApp:
             order_type = self.cepe_order_type.get()
             quantity_type = self.cepe_quantity_type.get()
             base_quantity = int(self.cepe_quantity_entry.get())
-            price = float(self.cepe_price_entry.get()) if self.cepe_price_entry.get() and float(self.cepe_price_entry.get()) > 0 else 0
+            
+            # Get user price (if specified)
+            user_price = 0
+            if self.cepe_price_entry.get():
+                user_price = float(self.cepe_price_entry.get())
             
             # Check protection
             self.update_daily_pnl()
@@ -4934,8 +4930,9 @@ class ZerodhaTradingApp:
             # Start real-time price updates
             self.start_price_updates_for_order(symbols)
             
-            # Show real-time price window
-            self.show_pe_real_time_price_window(symbols, transaction, order_type, quantity_type, base_quantity, price)
+            # Show real-time price window with auto limit info
+            self.show_pe_real_time_price_window(symbols, transaction, order_type, 
+                                               quantity_type, base_quantity, user_price)
             
         except ValueError as e:
             messagebox.showerror("Error", "Please enter valid quantity and price values")
@@ -4943,7 +4940,7 @@ class ZerodhaTradingApp:
             self.log_cepe_message(f"Error starting PE order placement: {e}")
     
     def place_ce_pe_together(self):
-        """Place combined order for selected CE and PE contracts"""
+        """Place combined order for selected CE and PE contracts with auto limit price"""
         if not self.is_logged_in:
             messagebox.showerror("Error", "Please login first")
             return
@@ -4957,7 +4954,11 @@ class ZerodhaTradingApp:
             order_type = self.cepe_order_type.get()
             quantity_type = self.cepe_quantity_type.get()
             base_quantity = int(self.cepe_quantity_entry.get())
-            price = float(self.cepe_price_entry.get()) if self.cepe_price_entry.get() and float(self.cepe_price_entry.get()) > 0 else 0
+            
+            # Get user price (if specified)
+            user_price = 0
+            if self.cepe_price_entry.get():
+                user_price = float(self.cepe_price_entry.get())
             
             # Check protection
             self.update_daily_pnl()
@@ -4979,9 +4980,10 @@ class ZerodhaTradingApp:
             # Start real-time price updates
             self.start_price_updates_for_order(all_symbols)
             
-            # Show real-time price window
+            # Show real-time price window with auto limit info
             self.show_ce_pe_together_real_time_window(
-                ce_symbols, pe_symbols, transaction, order_type, quantity_type, base_quantity, price
+                ce_symbols, pe_symbols, transaction, order_type, 
+                quantity_type, base_quantity, user_price
             )
             
         except ValueError as e:
@@ -4989,11 +4991,11 @@ class ZerodhaTradingApp:
         except Exception as e:
             self.log_cepe_message(f"Error starting CE/PE together order placement: {e}")
     
-    def show_ce_real_time_price_window(self, symbols, transaction, order_type, quantity_type, base_quantity, price):
-        """Show real-time price window for CE orders"""
+    def show_ce_real_time_price_window(self, symbols, transaction, order_type, quantity_type, base_quantity, user_price):
+        """Show real-time price window for CE orders with auto limit info"""
         price_window = tk.Toplevel(self.root)
         price_window.title("Real-time CE Prices - Confirm Order")
-        price_window.geometry("600x400")
+        price_window.geometry("700x500")  # Increased size for auto limit info
         price_window.transient(self.root)
         price_window.grab_set()
         
@@ -5002,32 +5004,82 @@ class ZerodhaTradingApp:
         main_frame = ttk.Frame(price_window)
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
-        title_label = ttk.Label(main_frame, text="Real-time CE Prices (Updating every 1 second)", 
+        title_label = ttk.Label(main_frame, text="Real-time CE Prices with Auto Limit Calculation", 
                                font=('Arial', 12, 'bold'))
         title_label.pack(pady=10)
         
-        price_frame = ttk.Frame(main_frame)
-        price_frame.pack(fill='both', expand=True, pady=10)
+        # Create paned window for better layout
+        paned_window = ttk.PanedWindow(main_frame, orient=tk.VERTICAL)
+        paned_window.pack(fill='both', expand=True, pady=10)
         
+        # Top frame for prices
+        price_frame = ttk.Frame(paned_window)
+        paned_window.add(price_frame, weight=2)
+        
+        # Price display frame
+        price_display_frame = ttk.LabelFrame(price_frame, text="Current Prices & Calculated Limits")
+        price_display_frame.pack(fill='both', expand=True, pady=10)
+        
+        # Create price labels for each symbol with limit price
         price_labels = {}
+        limit_labels = {}
         for i, symbol in enumerate(symbols):
-            symbol_frame = ttk.Frame(price_frame)
+            symbol_frame = ttk.Frame(price_display_frame)
             symbol_frame.pack(fill='x', pady=2)
             
+            # Symbol label
             ttk.Label(symbol_frame, text=f"{symbol}:", width=20, anchor='w').pack(side='left')
-            price_label = ttk.Label(symbol_frame, text="Fetching...", foreground='green', font=('Arial', 10, 'bold'))
-            price_label.pack(side='left')
+            
+            # Current price label
+            price_label = ttk.Label(symbol_frame, text="Fetching...", foreground='blue', font=('Arial', 10, 'bold'))
+            price_label.pack(side='left', padx=(0, 20))
             price_labels[symbol] = price_label
+            
+            # Limit price label (if LIMIT order)
+            if order_type == "LIMIT":
+                limit_label = ttk.Label(symbol_frame, text="Calculating...", foreground='green', font=('Arial', 10, 'bold'))
+                limit_label.pack(side='left')
+                limit_labels[symbol] = limit_label
         
-        info_frame = ttk.LabelFrame(main_frame, text="CE Order Information")
-        info_frame.pack(fill='x', pady=10)
+        # Bottom frame for info and buttons
+        info_frame = ttk.Frame(paned_window)
+        paned_window.add(info_frame, weight=1)
         
-        ttk.Label(info_frame, text=f"Transaction: {transaction} | Order Type: {order_type}").pack(pady=5)
-        ttk.Label(info_frame, text=f"Quantity: {base_quantity} ({quantity_type})").pack(pady=5)
-        ttk.Label(info_frame, text="Prices update every 1 second. Place orders when ready.", 
+        # Order information with auto limit details
+        info_label_frame = ttk.LabelFrame(info_frame, text="CE Order Information")
+        info_label_frame.pack(fill='x', pady=10)
+        
+        # Display auto limit settings
+        if order_type == "LIMIT":
+            tolerance_text = ""
+            if transaction == "BUY":
+                tolerance_text = f"BUY Tolerance: {self.ce_limit_settings['buy_tolerance_percent']}% below market"
+            else:
+                tolerance_text = f"SELL Tolerance: {self.ce_limit_settings['sell_tolerance_percent']}% above market"
+            
+            auto_limit_info = (
+                f"Auto Limit Price Calculation:\n"
+                f"{tolerance_text}\n"
+                f"Min Tick: {self.ce_limit_settings['min_price_tick']} | "
+                f"Max Adjust: {self.ce_limit_settings['max_price_adjustment']}%\n"
+                f"Market Fallback: {'Enabled' if self.ce_limit_settings['use_market_order_fallback'] else 'Disabled'}"
+            )
+            
+            ttk.Label(info_label_frame, text=auto_limit_info, 
+                     foreground='purple', font=('Arial', 9)).pack(pady=5)
+        
+        ttk.Label(info_label_frame, text=f"Transaction: {transaction} | Order Type: {order_type}").pack(pady=2)
+        ttk.Label(info_label_frame, text=f"Quantity: {base_quantity} ({quantity_type})").pack(pady=2)
+        
+        if user_price > 0:
+            ttk.Label(info_label_frame, text=f"User Specified Price: {user_price:.2f}", 
+                     foreground='orange').pack(pady=2)
+        
+        ttk.Label(info_label_frame, text="Prices update every 1 second. Place orders when ready.", 
                  foreground='green').pack(pady=5)
         
-        button_frame = ttk.Frame(main_frame)
+        # Buttons frame
+        button_frame = ttk.Frame(info_frame)
         button_frame.pack(fill='x', pady=10)
         
         def place_orders_now():
@@ -5037,7 +5089,7 @@ class ZerodhaTradingApp:
             
             Thread(
                 target=self.execute_ce_single_orders_with_current_prices,
-                args=(transaction, order_type, quantity_type, base_quantity, price),
+                args=(transaction, order_type, quantity_type, base_quantity, user_price),
                 daemon=True
             ).start()
         
@@ -5053,7 +5105,9 @@ class ZerodhaTradingApp:
         ttk.Button(button_frame, text="Cancel", 
                   command=cancel_orders).pack(side='left', padx=5)
         
-        self.update_ce_price_display(price_labels, price_window)
+        # Start price updates with limit calculation
+        self.update_ce_price_display_with_limit(price_labels, limit_labels, price_window, 
+                                               transaction, order_type, user_price)
     
     def update_ce_price_display(self, price_labels, window):
         """Update price labels with current prices for CE"""
@@ -5073,11 +5127,11 @@ class ZerodhaTradingApp:
         if window.winfo_exists():
             window.after(1000, lambda: self.update_ce_price_display(price_labels, window))
     
-    def show_pe_real_time_price_window(self, symbols, transaction, order_type, quantity_type, base_quantity, price):
-        """Show real-time price window for PE orders"""
+    def show_pe_real_time_price_window(self, symbols, transaction, order_type, quantity_type, base_quantity, user_price):
+        """Show real-time price window for PE orders with auto limit info"""
         price_window = tk.Toplevel(self.root)
         price_window.title("Real-time PE Prices - Confirm Order")
-        price_window.geometry("600x400")
+        price_window.geometry("700x500")  # Increased size for auto limit info
         price_window.transient(self.root)
         price_window.grab_set()
         
@@ -5086,32 +5140,82 @@ class ZerodhaTradingApp:
         main_frame = ttk.Frame(price_window)
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
-        title_label = ttk.Label(main_frame, text="Real-time PE Prices (Updating every 1 second)", 
+        title_label = ttk.Label(main_frame, text="Real-time PE Prices with Auto Limit Calculation", 
                                font=('Arial', 12, 'bold'))
         title_label.pack(pady=10)
         
-        price_frame = ttk.Frame(main_frame)
-        price_frame.pack(fill='both', expand=True, pady=10)
+        # Create paned window for better layout
+        paned_window = ttk.PanedWindow(main_frame, orient=tk.VERTICAL)
+        paned_window.pack(fill='both', expand=True, pady=10)
         
+        # Top frame for prices
+        price_frame = ttk.Frame(paned_window)
+        paned_window.add(price_frame, weight=2)
+        
+        # Price display frame
+        price_display_frame = ttk.LabelFrame(price_frame, text="Current Prices & Calculated Limits")
+        price_display_frame.pack(fill='both', expand=True, pady=10)
+        
+        # Create price labels for each symbol with limit price
         price_labels = {}
+        limit_labels = {}
         for i, symbol in enumerate(symbols):
-            symbol_frame = ttk.Frame(price_frame)
+            symbol_frame = ttk.Frame(price_display_frame)
             symbol_frame.pack(fill='x', pady=2)
             
+            # Symbol label
             ttk.Label(symbol_frame, text=f"{symbol}:", width=20, anchor='w').pack(side='left')
-            price_label = ttk.Label(symbol_frame, text="Fetching...", foreground='red', font=('Arial', 10, 'bold'))
-            price_label.pack(side='left')
+            
+            # Current price label
+            price_label = ttk.Label(symbol_frame, text="Fetching...", foreground='blue', font=('Arial', 10, 'bold'))
+            price_label.pack(side='left', padx=(0, 20))
             price_labels[symbol] = price_label
+            
+            # Limit price label (if LIMIT order)
+            if order_type == "LIMIT":
+                limit_label = ttk.Label(symbol_frame, text="Calculating...", foreground='green', font=('Arial', 10, 'bold'))
+                limit_label.pack(side='left')
+                limit_labels[symbol] = limit_label
         
-        info_frame = ttk.LabelFrame(main_frame, text="PE Order Information")
-        info_frame.pack(fill='x', pady=10)
+        # Bottom frame for info and buttons
+        info_frame = ttk.Frame(paned_window)
+        paned_window.add(info_frame, weight=1)
         
-        ttk.Label(info_frame, text=f"Transaction: {transaction} | Order Type: {order_type}").pack(pady=5)
-        ttk.Label(info_frame, text=f"Quantity: {base_quantity} ({quantity_type})").pack(pady=5)
-        ttk.Label(info_frame, text="Prices update every 1 second. Place orders when ready.", 
+        # Order information with auto limit details
+        info_label_frame = ttk.LabelFrame(info_frame, text="PE Order Information")
+        info_label_frame.pack(fill='x', pady=10)
+        
+        # Display auto limit settings
+        if order_type == "LIMIT":
+            tolerance_text = ""
+            if transaction == "BUY":
+                tolerance_text = f"BUY Tolerance: {self.pe_limit_settings['buy_tolerance_percent']}% below market"
+            else:
+                tolerance_text = f"SELL Tolerance: {self.pe_limit_settings['sell_tolerance_percent']}% above market"
+            
+            auto_limit_info = (
+                f"Auto Limit Price Calculation:\n"
+                f"{tolerance_text}\n"
+                f"Min Tick: {self.pe_limit_settings['min_price_tick']} | "
+                f"Max Adjust: {self.pe_limit_settings['max_price_adjustment']}%\n"
+                f"Market Fallback: {'Enabled' if self.pe_limit_settings['use_market_order_fallback'] else 'Disabled'}"
+            )
+            
+            ttk.Label(info_label_frame, text=auto_limit_info, 
+                     foreground='purple', font=('Arial', 9)).pack(pady=5)
+        
+        ttk.Label(info_label_frame, text=f"Transaction: {transaction} | Order Type: {order_type}").pack(pady=2)
+        ttk.Label(info_label_frame, text=f"Quantity: {base_quantity} ({quantity_type})").pack(pady=2)
+        
+        if user_price > 0:
+            ttk.Label(info_label_frame, text=f"User Specified Price: {user_price:.2f}", 
+                     foreground='orange').pack(pady=2)
+        
+        ttk.Label(info_label_frame, text="Prices update every 1 second. Place orders when ready.", 
                  foreground='green').pack(pady=5)
         
-        button_frame = ttk.Frame(main_frame)
+        # Buttons frame
+        button_frame = ttk.Frame(info_frame)
         button_frame.pack(fill='x', pady=10)
         
         def place_orders_now():
@@ -5121,7 +5225,7 @@ class ZerodhaTradingApp:
             
             Thread(
                 target=self.execute_pe_single_orders_with_current_prices,
-                args=(transaction, order_type, quantity_type, base_quantity, price),
+                args=(transaction, order_type, quantity_type, base_quantity, user_price),
                 daemon=True
             ).start()
         
@@ -5137,7 +5241,9 @@ class ZerodhaTradingApp:
         ttk.Button(button_frame, text="Cancel", 
                   command=cancel_orders).pack(side='left', padx=5)
         
-        self.update_pe_price_display(price_labels, price_window)
+        # Start price updates with limit calculation
+        self.update_pe_price_display_with_limit(price_labels, limit_labels, price_window, 
+                                               transaction, order_type, user_price)
     
     def update_pe_price_display(self, price_labels, window):
         """Update price labels with current prices for PE"""
@@ -5157,11 +5263,12 @@ class ZerodhaTradingApp:
         if window.winfo_exists():
             window.after(1000, lambda: self.update_pe_price_display(price_labels, window))
     
-    def show_ce_pe_together_real_time_window(self, ce_symbols, pe_symbols, transaction, order_type, quantity_type, base_quantity, price):
-        """Show real-time price window for CE/PE together orders"""
+        def show_ce_pe_together_real_time_window(self, ce_symbols, pe_symbols, transaction, order_type, 
+                                           quantity_type, base_quantity, user_price):
+        """Show real-time price window for CE/PE together orders with auto limit info"""
         price_window = tk.Toplevel(self.root)
         price_window.title("Real-time CE & PE Prices - Confirm Combined Order")
-        price_window.geometry("700x500")
+        price_window.geometry("800x600")  # Increased size for auto limit info
         price_window.transient(self.root)
         price_window.grab_set()
         
@@ -5170,48 +5277,115 @@ class ZerodhaTradingApp:
         main_frame = ttk.Frame(price_window)
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
-        title_label = ttk.Label(main_frame, text="Real-time CE & PE Prices for Combined Order", 
+        title_label = ttk.Label(main_frame, text="Real-time CE & PE Prices with Auto Limit Calculation", 
                                font=('Arial', 12, 'bold'))
         title_label.pack(pady=10)
         
-        paned_window = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
-        paned_window.pack(fill='both', expand=True, pady=10)
+        # Create paned window for better layout
+        main_paned = ttk.PanedWindow(main_frame, orient=tk.VERTICAL)
+        main_paned.pack(fill='both', expand=True, pady=10)
         
-        ce_frame = ttk.LabelFrame(paned_window, text="CE Contracts")
-        paned_window.add(ce_frame, weight=1)
+        # Top frame for prices (CE and PE side by side)
+        prices_frame = ttk.Frame(main_paned)
+        main_paned.add(prices_frame, weight=2)
         
-        pe_frame = ttk.LabelFrame(paned_window, text="PE Contracts")
-        paned_window.add(pe_frame, weight=1)
+        # Create horizontal paned window for CE/PE prices
+        prices_paned = ttk.PanedWindow(prices_frame, orient=tk.HORIZONTAL)
+        prices_paned.pack(fill='both', expand=True)
         
+        # CE Prices Frame
+        ce_price_frame = ttk.LabelFrame(prices_paned, text="CE Contracts")
+        prices_paned.add(ce_price_frame, weight=1)
+        
+        # PE Prices Frame
+        pe_price_frame = ttk.LabelFrame(prices_paned, text="PE Contracts")
+        prices_paned.add(pe_price_frame, weight=1)
+        
+        # Create price labels for CE symbols
         ce_price_labels = {}
+        ce_limit_labels = {}
         for symbol in ce_symbols:
-            symbol_frame = ttk.Frame(ce_frame)
+            symbol_frame = ttk.Frame(ce_price_frame)
             symbol_frame.pack(fill='x', pady=2, padx=5)
             
             ttk.Label(symbol_frame, text=f"{symbol}:", width=25, anchor='w').pack(side='left')
+            
             price_label = ttk.Label(symbol_frame, text="Fetching...", foreground='green', font=('Arial', 9, 'bold'))
-            price_label.pack(side='left')
+            price_label.pack(side='left', padx=(0, 10))
             ce_price_labels[symbol] = price_label
+            
+            if order_type == "LIMIT":
+                limit_label = ttk.Label(symbol_frame, text="Calc...", foreground='darkgreen', font=('Arial', 9))
+                limit_label.pack(side='left')
+                ce_limit_labels[symbol] = limit_label
         
+        # Create price labels for PE symbols
         pe_price_labels = {}
+        pe_limit_labels = {}
         for symbol in pe_symbols:
-            symbol_frame = ttk.Frame(pe_frame)
+            symbol_frame = ttk.Frame(pe_price_frame)
             symbol_frame.pack(fill='x', pady=2, padx=5)
             
             ttk.Label(symbol_frame, text=f"{symbol}:", width=25, anchor='w').pack(side='left')
+            
             price_label = ttk.Label(symbol_frame, text="Fetching...", foreground='red', font=('Arial', 9, 'bold'))
-            price_label.pack(side='left')
+            price_label.pack(side='left', padx=(0, 10))
             pe_price_labels[symbol] = price_label
+            
+            if order_type == "LIMIT":
+                limit_label = ttk.Label(symbol_frame, text="Calc...", foreground='darkred', font=('Arial', 9))
+                limit_label.pack(side='left')
+                pe_limit_labels[symbol] = limit_label
         
-        info_frame = ttk.LabelFrame(main_frame, text="CE/PE Order Summary")
-        info_frame.pack(fill='x', pady=10)
+        # Bottom frame for info and buttons
+        info_frame = ttk.Frame(main_paned)
+        main_paned.add(info_frame, weight=1)
         
-        ttk.Label(info_frame, text=f"CE: {len(ce_symbols)} contracts | PE: {len(pe_symbols)} contracts").pack(pady=2)
-        ttk.Label(info_frame, text=f"Transaction: {transaction} | Order Type: {order_type}").pack(pady=2)
-        ttk.Label(info_frame, text="Prices update every 1 second. Place orders when ready.", 
-                 foreground='blue').pack(pady=2)
+        # Order information with auto limit details
+        info_label_frame = ttk.LabelFrame(info_frame, text="CE/PE Order Information")
+        info_label_frame.pack(fill='x', pady=10)
         
-        button_frame = ttk.Frame(main_frame)
+        # Display auto limit settings for both CE and PE
+        if order_type == "LIMIT":
+            tolerance_text = ""
+            if transaction == "BUY":
+                tolerance_text = (
+                    f"CE BUY Tolerance: {self.ce_limit_settings['buy_tolerance_percent']}% below market | "
+                    f"PE BUY Tolerance: {self.pe_limit_settings['buy_tolerance_percent']}% below market"
+                )
+            else:
+                tolerance_text = (
+                    f"CE SELL Tolerance: {self.ce_limit_settings['sell_tolerance_percent']}% above market | "
+                    f"PE SELL Tolerance: {self.pe_limit_settings['sell_tolerance_percent']}% above market"
+                )
+            
+            auto_limit_info = (
+                f"Auto Limit Price Calculation:\n"
+                f"{tolerance_text}\n"
+                f"CE Settings: Min Tick={self.ce_limit_settings['min_price_tick']}, "
+                f"Max Adjust={self.ce_limit_settings['max_price_adjustment']}%, "
+                f"Fallback={'Yes' if self.ce_limit_settings['use_market_order_fallback'] else 'No'}\n"
+                f"PE Settings: Min Tick={self.pe_limit_settings['min_price_tick']}, "
+                f"Max Adjust={self.pe_limit_settings['max_price_adjustment']}%, "
+                f"Fallback={'Yes' if self.pe_limit_settings['use_market_order_fallback'] else 'No'}"
+            )
+            
+            ttk.Label(info_label_frame, text=auto_limit_info, 
+                     foreground='purple', font=('Arial', 9)).pack(pady=5)
+        
+        ttk.Label(info_label_frame, text=f"Transaction: {transaction} | Order Type: {order_type}").pack(pady=2)
+        ttk.Label(info_label_frame, text=f"CE: {len(ce_symbols)} contracts | PE: {len(pe_symbols)} contracts").pack(pady=2)
+        ttk.Label(info_label_frame, text=f"Quantity: {base_quantity} ({quantity_type})").pack(pady=2)
+        
+        if user_price > 0:
+            ttk.Label(info_label_frame, text=f"User Specified Price: {user_price:.2f}", 
+                     foreground='orange').pack(pady=2)
+        
+        ttk.Label(info_label_frame, text="Prices update every 1 second. Place orders when ready.", 
+                 foreground='blue').pack(pady=5)
+        
+        # Buttons frame
+        button_frame = ttk.Frame(info_frame)
         button_frame.pack(fill='x', pady=10)
         
         def place_orders_now():
@@ -5221,7 +5395,7 @@ class ZerodhaTradingApp:
             
             Thread(
                 target=self.execute_ce_pe_together_orders_with_current_prices,
-                args=(transaction, order_type, quantity_type, base_quantity, price),
+                args=(transaction, order_type, quantity_type, base_quantity, user_price),
                 daemon=True
             ).start()
         
@@ -5237,7 +5411,11 @@ class ZerodhaTradingApp:
         ttk.Button(button_frame, text="Cancel", 
                   command=cancel_orders).pack(side='left', padx=5)
         
-        self.update_ce_pe_together_price_display(ce_price_labels, pe_price_labels, price_window)
+        # Start price updates with limit calculation
+        self.update_ce_pe_together_price_display_with_limit(
+            ce_price_labels, ce_limit_labels, pe_price_labels, pe_limit_labels,
+            window=price_window, transaction=transaction, order_type=order_type, user_price=user_price
+        )
     
     def update_ce_pe_together_price_display(self, ce_labels, pe_labels, window):
         """Update price labels for CE/PE together"""
@@ -5265,8 +5443,8 @@ class ZerodhaTradingApp:
         if window.winfo_exists():
             window.after(1000, lambda: self.update_ce_pe_together_price_display(ce_labels, pe_labels, window))
     
-    def execute_ce_single_orders_with_current_prices(self, transaction, order_type, quantity_type, base_quantity, price):
-        """Execute CE single transaction orders using latest prices with protection"""
+    def execute_ce_single_orders_with_current_prices(self, transaction, order_type, quantity_type, base_quantity, user_price):
+        """Execute CE single transaction orders using latest prices with protection and auto limit"""
         orders_placed = 0
         total_orders = len(self.selected_ce_options)
         
@@ -5300,17 +5478,30 @@ class ZerodhaTradingApp:
                         self.log_cepe_message(f"❌ Could not fetch LTP for {symbol}, skipping...")
                         continue
                 
-                # Determine final price
-                final_price = price
+                # ===== NEW: AUTO LIMIT PRICE CALCULATION =====
+                final_price = user_price
                 if order_type == "LIMIT":
-                    if price == 0:
-                        if transaction == "BUY":
-                            #final_price = current_price * 0.995
-                            final_price = math.ceil(current_price / 0.5) * 0.5
-                        else:
-                            #final_price = current_price * 1.005
-                            final_price =  math.floor(current_price / 0.5) * 0.5
-                    self.log_cepe_message(f"CE Limit order for {symbol}: Using price {final_price:.2f} (Current LTP: {current_price:.2f})")
+                    # Apply auto limit price with tolerance
+                    auto_limit_price = self.apply_limit_price_tolerance(
+                        symbol, current_price, transaction, user_price, 'CE'
+                    )
+                    
+                    if auto_limit_price is not None:
+                        final_price = auto_limit_price
+                        self.log_cepe_message(
+                            f"CE Limit order for {symbol}: "
+                            f"Using auto price {final_price:.2f} "
+                            f"(Market: {current_price:.2f})"
+                        )
+                    elif self.ce_limit_settings['use_market_order_fallback']:
+                        # Fallback to market order if auto limit fails
+                        self.log_cepe_message(
+                            f"⚠️ Auto limit price failed for {symbol}, "
+                            f"falling back to MARKET order"
+                        )
+                        order_type = "MARKET"
+                        final_price = None
+                # =============================================
                 
                 # Place order
                 order_id = self.kite.place_order(
@@ -5327,7 +5518,12 @@ class ZerodhaTradingApp:
                 orders_placed += 1
                 self.order_count_per_symbol[symbol] = self.order_count_per_symbol.get(symbol, 0) + 1
                 
-                self.log_cepe_message(f"✅ {transaction} CE Order {orders_placed}/{total_orders}: {symbol} {quantity} @ {final_price if order_type == 'LIMIT' else 'MARKET'} - ID: {order_id}")
+                order_type_str = "LIMIT" if order_type == "LIMIT" else "MARKET"
+                price_str = f"@ {final_price:.2f}" if order_type == "LIMIT" else "@ MARKET"
+                self.log_cepe_message(
+                    f"✅ {transaction} CE Order {orders_placed}/{total_orders}: "
+                    f"{symbol} {quantity} {price_str} ({order_type_str}) - ID: {order_id}"
+                )
                 
                 time.sleep(1)
                 
@@ -5352,8 +5548,8 @@ class ZerodhaTradingApp:
         
         self.root.after(0, show_summary)
     
-    def execute_pe_single_orders_with_current_prices(self, transaction, order_type, quantity_type, base_quantity, price):
-        """Execute PE single transaction orders using latest prices with protection"""
+    def execute_pe_single_orders_with_current_prices(self, transaction, order_type, quantity_type, base_quantity, user_price):
+        """Execute PE single transaction orders using latest prices with protection and auto limit"""
         orders_placed = 0
         total_orders = len(self.selected_pe_options)
         
@@ -5387,17 +5583,30 @@ class ZerodhaTradingApp:
                         self.log_cepe_message(f"❌ Could not fetch LTP for {symbol}, skipping...")
                         continue
                 
-                # Determine final price
-                final_price = price
+                # ===== NEW: AUTO LIMIT PRICE CALCULATION =====
+                final_price = user_price
                 if order_type == "LIMIT":
-                    if price == 0:
-                        if transaction == "BUY":
-                            #final_price = current_price * 0.995
-                            final_price = math.ceil(current_price / 0.5) * 0.5
-                        else:
-                            #final_price = current_price * 1.005
-                            final_price = math.floor(current_price / 0.5) * 0.5
-                    self.log_cepe_message(f"PE Limit order for {symbol}: Using price {final_price:.2f} (Current LTP: {current_price:.2f})")
+                    # Apply auto limit price with tolerance
+                    auto_limit_price = self.apply_limit_price_tolerance(
+                        symbol, current_price, transaction, user_price, 'PE'
+                    )
+                    
+                    if auto_limit_price is not None:
+                        final_price = auto_limit_price
+                        self.log_cepe_message(
+                            f"PE Limit order for {symbol}: "
+                            f"Using auto price {final_price:.2f} "
+                            f"(Market: {current_price:.2f})"
+                        )
+                    elif self.pe_limit_settings['use_market_order_fallback']:
+                        # Fallback to market order if auto limit fails
+                        self.log_cepe_message(
+                            f"⚠️ Auto limit price failed for {symbol}, "
+                            f"falling back to MARKET order"
+                        )
+                        order_type = "MARKET"
+                        final_price = None
+                # =============================================
                 
                 # Place order
                 order_id = self.kite.place_order(
@@ -5414,7 +5623,12 @@ class ZerodhaTradingApp:
                 orders_placed += 1
                 self.order_count_per_symbol[symbol] = self.order_count_per_symbol.get(symbol, 0) + 1
                 
-                self.log_cepe_message(f"✅ {transaction} PE Order {orders_placed}/{total_orders}: {symbol} {quantity} @ {final_price if order_type == 'LIMIT' else 'MARKET'} - ID: {order_id}")
+                order_type_str = "LIMIT" if order_type == "LIMIT" else "MARKET"
+                price_str = f"@ {final_price:.2f}" if order_type == "LIMIT" else "@ MARKET"
+                self.log_cepe_message(
+                    f"✅ {transaction} PE Order {orders_placed}/{total_orders}: "
+                    f"{symbol} {quantity} {price_str} ({order_type_str}) - ID: {order_id}"
+                )
                 
                 time.sleep(1)
                 
@@ -5439,8 +5653,8 @@ class ZerodhaTradingApp:
         
         self.root.after(0, show_summary)
     
-    def execute_ce_pe_together_orders_with_current_prices(self, transaction, order_type, quantity_type, base_quantity, price):
-        """Execute both CE and PE orders together using latest prices with protection"""
+    def execute_ce_pe_together_orders_with_current_prices(self, transaction, order_type, quantity_type, base_quantity, user_price):
+        """Execute both CE and PE orders together using latest prices with protection and auto limit"""
         total_ce_orders = len(self.selected_ce_options)
         total_pe_orders = len(self.selected_pe_options)
         ce_orders_placed = 0
@@ -5477,17 +5691,30 @@ class ZerodhaTradingApp:
                             self.log_cepe_message(f"❌ Could not fetch LTP for CE {symbol}, skipping...")
                             continue
                     
-                    
-                    # Determine final price for CE
-                    final_price = price
+                    # Determine final price for CE with auto limit
+                    current_order_type = order_type
+                    final_price = user_price
                     if order_type == "LIMIT":
-                        if price == 0:
-                            if transaction == "BUY":
-                            
-                                final_price = math.ceil(current_price / 0.5) * 0.5
-                            else:
-                                final_price =  math.floor(current_price / 0.5) * 0.5
-                        self.log_cepe_message(f"CE Limit order for {symbol}: Using price {final_price:.2f} (Current LTP: {current_price:.2f})")
+                        # Apply auto limit price with tolerance for CE
+                        auto_limit_price = self.apply_limit_price_tolerance(
+                            symbol, current_price, transaction, user_price, 'CE'
+                        )
+                        
+                        if auto_limit_price is not None:
+                            final_price = auto_limit_price
+                            self.log_cepe_message(
+                                f"CE Limit order for {symbol}: "
+                                f"Using auto price {final_price:.2f} "
+                                f"(Market: {current_price:.2f})"
+                            )
+                        elif self.ce_limit_settings['use_market_order_fallback']:
+                            # Fallback to market order
+                            self.log_cepe_message(
+                                f"⚠️ Auto limit price failed for CE {symbol}, "
+                                f"falling back to MARKET order"
+                            )
+                            current_order_type = "MARKET"
+                            final_price = None
                     
                     # Place CE order
                     order_id = self.kite.place_order(
@@ -5496,14 +5723,20 @@ class ZerodhaTradingApp:
                         tradingsymbol=symbol,
                         transaction_type=transaction,
                         quantity=quantity,
-                        order_type=order_type,
+                        order_type=current_order_type,
                         product=self.kite.PRODUCT_NRML,
-                        price=final_price if order_type == "LIMIT" else None
+                        price=final_price if current_order_type == "LIMIT" else None
                     )
                     
                     ce_orders_placed += 1
                     self.order_count_per_symbol[symbol] = self.order_count_per_symbol.get(symbol, 0) + 1
-                    self.log_cepe_message(f"✅ CE Order {ce_orders_placed}/{total_ce_orders}: {symbol} {quantity} @ {final_price if order_type == 'LIMIT' else 'MARKET'} - ID: {order_id}")
+                    
+                    order_type_str = "LIMIT" if current_order_type == "LIMIT" else "MARKET"
+                    price_str = f"@ {final_price:.2f}" if current_order_type == "LIMIT" else "@ MARKET"
+                    self.log_cepe_message(
+                        f"✅ CE Order {ce_orders_placed}/{total_ce_orders}: "
+                        f"{symbol} {quantity} {price_str} ({order_type_str}) - ID: {order_id}"
+                    )
                     
                     time.sleep(1)
                     
@@ -5539,16 +5772,30 @@ class ZerodhaTradingApp:
                             self.log_cepe_message(f"❌ Could not fetch LTP for PE {symbol}, skipping...")
                             continue
                     
-                    # Determine final price for PE
-                    final_price = price
+                    # Determine final price for PE with auto limit
+                    current_order_type = order_type
+                    final_price = user_price
                     if order_type == "LIMIT":
-                        if price == 0:
-                            if transaction == "BUY":
-                                final_price = math.ceil(current_price / 0.5) * 0.5
-                            else:
-                                final_price = math.floor(current_price / 0.5) * 0.5
-                            #final_price = current_price * 0.995
-                        self.log_cepe_message(f"PE Limit order for {symbol}: Using price {final_price:.2f} (Current LTP: {current_price:.2f})")
+                        # Apply auto limit price with tolerance for PE
+                        auto_limit_price = self.apply_limit_price_tolerance(
+                            symbol, current_price, transaction, user_price, 'PE'
+                        )
+                        
+                        if auto_limit_price is not None:
+                            final_price = auto_limit_price
+                            self.log_cepe_message(
+                                f"PE Limit order for {symbol}: "
+                                f"Using auto price {final_price:.2f} "
+                                f"(Market: {current_price:.2f})"
+                            )
+                        elif self.pe_limit_settings['use_market_order_fallback']:
+                            # Fallback to market order
+                            self.log_cepe_message(
+                                f"⚠️ Auto limit price failed for PE {symbol}, "
+                                f"falling back to MARKET order"
+                            )
+                            current_order_type = "MARKET"
+                            final_price = None
                     
                     # Place PE order
                     order_id = self.kite.place_order(
@@ -5557,14 +5804,20 @@ class ZerodhaTradingApp:
                         tradingsymbol=symbol,
                         transaction_type=transaction,
                         quantity=quantity,
-                        order_type=order_type,
+                        order_type=current_order_type,
                         product=self.kite.PRODUCT_NRML,
-                        price=final_price if order_type == "LIMIT" else None
+                        price=final_price if current_order_type == "LIMIT" else None
                     )
                     
                     pe_orders_placed += 1
                     self.order_count_per_symbol[symbol] = self.order_count_per_symbol.get(symbol, 0) + 1
-                    self.log_cepe_message(f"✅ PE Order {pe_orders_placed}/{total_pe_orders}: {symbol} {quantity} @ {final_price if order_type == 'LIMIT' else 'MARKET'} - ID: {order_id}")
+                    
+                    order_type_str = "LIMIT" if current_order_type == "LIMIT" else "MARKET"
+                    price_str = f"@ {final_price:.2f}" if current_order_type == "LIMIT" else "@ MARKET"
+                    self.log_cepe_message(
+                        f"✅ PE Order {pe_orders_placed}/{total_pe_orders}: "
+                        f"{symbol} {quantity} {price_str} ({order_type_str}) - ID: {order_id}"
+                    )
                     
                     time.sleep(1)
                     
@@ -5609,493 +5862,439 @@ class ZerodhaTradingApp:
         except:
             pass
 
-
-    def setup_position_exit_tab(self, notebook):
-        """Setup position exit tab with automatic limit prices"""
-        exit_frame = ttk.Frame(notebook)
-        notebook.add(exit_frame, text="Position Exit")
+    def calculate_auto_limit_price(self, current_price, transaction_type, option_type='CE'):
+        """
+        Calculate automatic limit price based on tolerance settings
         
-        # Main container
-        main_container = ttk.Frame(exit_frame)
-        main_container.pack(fill='both', expand=True, padx=10, pady=10)
+        Args:
+            current_price: Current market price
+            transaction_type: 'BUY' or 'SELL'
+            option_type: 'CE' or 'PE'
         
-        # Control Frame
-        control_frame = ttk.LabelFrame(main_container, text="Position Exit Controls")
-        control_frame.pack(fill='x', padx=5, pady=5)
-        
-        # Auto Exit Settings Frame
-        settings_frame = ttk.Frame(control_frame)
-        settings_frame.pack(fill='x', padx=5, pady=5)
-        
-        # Tolerance Settings
-        ttk.Label(settings_frame, text="Buy Exit Tolerance (%):").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.buy_exit_tolerance_var = tk.StringVar(value="0.5")
-        ttk.Entry(settings_frame, textvariable=self.buy_exit_tolerance_var, width=10).grid(row=0, column=1, padx=5, pady=5, sticky='w')
-        
-        ttk.Label(settings_frame, text="Sell Exit Tolerance (%):").grid(row=0, column=2, padx=5, pady=5, sticky='w')
-        self.sell_exit_tolerance_var = tk.StringVar(value="0.5")
-        ttk.Entry(settings_frame, textvariable=self.sell_exit_tolerance_var, width=10).grid(row=0, column=3, padx=5, pady=5, sticky='w')
-        
-        # Price Tick Settings
-        ttk.Label(settings_frame, text="Price Tick:").grid(row=1, column=0, padx=5, pady=5, sticky='w')
-        self.exit_price_tick_var = tk.StringVar(value="0.05")
-        ttk.Entry(settings_frame, textvariable=self.exit_price_tick_var, width=10).grid(row=1, column=1, padx=5, pady=5, sticky='w')
-        
-        # Max Adjustment
-        ttk.Label(settings_frame, text="Max Adjustment (%):").grid(row=1, column=2, padx=5, pady=5, sticky='w')
-        self.max_exit_adjustment_var = tk.StringVar(value="2.0")
-        ttk.Entry(settings_frame, textvariable=self.max_exit_adjustment_var, width=10).grid(row=1, column=3, padx=5, pady=5, sticky='w')
-        
-        # Auto Exit Options
-        options_frame = ttk.Frame(control_frame)
-        options_frame.pack(fill='x', padx=5, pady=5)
-        
-        self.auto_limit_exit_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(options_frame, text="Enable Auto Limit Prices", 
-                        variable=self.auto_limit_exit_var).pack(side='left', padx=5)
-        
-        self.use_market_fallback_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(options_frame, text="Market Order Fallback", 
-                        variable=self.use_market_fallback_var).pack(side='left', padx=5)
-        
-        # Buttons Frame
-        button_frame = ttk.Frame(control_frame)
-        button_frame.pack(fill='x', padx=5, pady=10)
-        
-        ttk.Button(button_frame, text="Refresh Positions", 
-                command=self.refresh_exit_positions).pack(side='left', padx=5)
-        ttk.Button(button_frame, text="Exit Selected Positions", 
-                command=self.exit_selected_positions).pack(side='left', padx=5)
-        ttk.Button(button_frame, text="Exit All Positions", 
-                command=self.exit_all_positions).pack(side='left', padx=5)
-        ttk.Button(button_frame, text="Calculate Exit Prices", 
-                command=self.calculate_exit_prices).pack(side='left', padx=5)
-        
-        # Positions Table Frame
-        table_frame = ttk.LabelFrame(main_container, text="Current Positions for Exit")
-        table_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        
-        # Create treeview with scrollbars
-        tree_frame = ttk.Frame(table_frame)
-        tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        
-        # Horizontal scrollbar
-        h_scroll = ttk.Scrollbar(tree_frame, orient='horizontal')
-        h_scroll.pack(side='bottom', fill='x')
-        
-        # Vertical scrollbar
-        v_scroll = ttk.Scrollbar(tree_frame)
-        v_scroll.pack(side='right', fill='y')
-        
-        # Treeview
-        self.exit_positions_tree = ttk.Treeview(tree_frame, columns=(
-            'Select', 'Symbol', 'Quantity', 'Avg Price', 'LTP', 'P&L', 'Type',
-            'Exit Price', 'Exit Type', 'Status'
-        ), show='headings', xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set, height=15)
-        
-        h_scroll.config(command=self.exit_positions_tree.xview)
-        v_scroll.config(command=self.exit_positions_tree.yview)
-        
-        # Define headings
-        columns = {
-            'Select': ('✓', 40),
-            'Symbol': ('Symbol', 120),
-            'Quantity': ('Qty', 80),
-            'Avg Price': ('Avg Price', 90),
-            'LTP': ('LTP', 90),
-            'P&L': ('P&L', 90),
-            'Type': ('Type', 60),
-            'Exit Price': ('Exit Price', 90),
-            'Exit Type': ('Exit Type', 90),
-            'Status': ('Status', 100)
-        }
-        
-        for col, (text, width) in columns.items():
-            self.exit_positions_tree.heading(col, text=text)
-            self.exit_positions_tree.column(col, width=width, anchor='center')
-        
-        self.exit_positions_tree.pack(fill='both', expand=True)
-        
-        # Bind click event for selection
-        self.exit_positions_tree.bind('<Button-1>', self.on_exit_position_select)
-        
-        # Status Frame
-        status_frame = ttk.LabelFrame(main_container, text="Exit Status")
-        status_frame.pack(fill='x', padx=5, pady=5)
-        
-        self.exit_status_text = scrolledtext.ScrolledText(status_frame, height=8)
-        self.exit_status_text.pack(fill='both', expand=True, padx=5, pady=5)
-        self.exit_status_text.insert(tk.END, "Ready for position exit...\n")
-        
-        # Store selected positions for exit
-        self.selected_exit_positions = {}
-
-    def on_exit_position_select(self, event):
-        """Handle selection of positions for exit"""
-        item = self.exit_positions_tree.identify_row(event.y)
-        column = self.exit_positions_tree.identify_column(event.x)
-        
-        if item and column == '#1':  # Clicked on select column
-            values = self.exit_positions_tree.item(item, 'values')
-            symbol = values[1]
-            
-            if symbol in self.selected_exit_positions:
-                # Deselect
-                self.exit_positions_tree.set(item, 'Select', '□')
-                del self.selected_exit_positions[symbol]
-                self.log_exit_message(f"Deselected {symbol} for exit")
+        Returns:
+            Calculated limit price
+        """
+        try:
+            if option_type == 'CE':
+                settings = self.ce_limit_settings
             else:
-                # Select
-                self.exit_positions_tree.set(item, 'Select', '✓')
-                self.selected_exit_positions[symbol] = {
-                    'symbol': symbol,
-                    'quantity': int(values[2]),
-                    'avg_price': float(values[3]),
-                    'ltp': float(values[4]) if values[4] != 'N/A' else 0,
-                    'type': values[6],
-                    'exit_price': values[7] if values[7] != 'Calc...' else 0,
-                    'exit_type': values[8]
-                }
-                self.log_exit_message(f"Selected {symbol} for exit")
-
-    def refresh_exit_positions(self):
-        """Refresh positions for exit tab"""
-        if not self.is_logged_in:
-            messagebox.showerror("Error", "Please login first")
-            return
-        
-        try:
-            positions = self.kite.positions()
+                settings = self.pe_limit_settings
             
-            # Clear existing data
-            for item in self.exit_positions_tree.get_children():
-                self.exit_positions_tree.delete(item)
+            if not settings['auto_limit_enabled']:
+                return None
             
-            # Clear selection
-            self.selected_exit_positions.clear()
+            if transaction_type == 'BUY':
+                tolerance = settings['buy_tolerance_percent']
+                # For BUY: Price below market
+                limit_price = current_price * (1 - tolerance / 100)
+            else:  # SELL
+                tolerance = settings['sell_tolerance_percent']
+                # For SELL: Price above market
+                limit_price = current_price * (1 + tolerance / 100)
             
-            # Add net positions
-            total_positions = 0
-            for position in positions['net']:
-                if position['quantity'] != 0:
-                    total_positions += 1
-                    symbol = position['tradingsymbol']
-                    quantity = position['quantity']
-                    avg_price = position['average_price']
-                    ltp = position['last_price']
-                    pnl = position['pnl']
-                    
-                    # Determine position type
-                    pos_type = "LONG" if quantity > 0 else "SHORT"
-                    
-                    # Calculate initial exit price
-                    exit_price = 'Calc...'
-                    exit_type = 'LIMIT'
-                    
-                    # Color code based on P&L
-                    tags = ()
-                    if pnl > 0:
-                        tags = ('profit',)
-                    elif pnl < 0:
-                        tags = ('loss',)
-                    
-                    self.exit_positions_tree.insert('', 'end', values=(
-                        '□',  # Select checkbox
-                        symbol,
-                        abs(quantity),
-                        f"{avg_price:.2f}",
-                        f"{ltp:.2f}",
-                        f"{pnl:.2f}",
-                        pos_type,
-                        exit_price,
-                        exit_type,
-                        'Ready'
-                    ), tags=tags)
+            # Apply minimum price tick
+            min_tick = settings['min_price_tick']
+            if min_tick > 0:
+                limit_price = round(limit_price / min_tick) * min_tick
             
-            # Configure tag colors
-            self.exit_positions_tree.tag_configure('profit', foreground='green')
-            self.exit_positions_tree.tag_configure('loss', foreground='red')
+            # Check maximum adjustment
+            max_adjustment = settings['max_price_adjustment']
+            price_diff_percent = abs(limit_price - current_price) / current_price * 100
+            if price_diff_percent > max_adjustment:
+                # Clamp to maximum adjustment
+                if transaction_type == 'BUY':
+                    limit_price = current_price * (1 - max_adjustment / 100)
+                else:
+                    limit_price = current_price * (1 + max_adjustment / 100)
             
-            self.log_exit_message(f"Refreshed {total_positions} positions for exit")
+            # Round to 2 decimal places
+            limit_price = round(limit_price, 2)
             
-            # Auto-calculate exit prices if positions exist
-            if total_positions > 0:
-                self.calculate_exit_prices()
+            # Ensure limit price is valid
+            if limit_price <= 0:
+                return None
                 
-        except Exception as e:
-            self.log_exit_message(f"Error refreshing exit positions: {e}")
-
-    def calculate_exit_prices(self):
-        """Calculate automatic exit prices for all positions"""
-        if not self.is_logged_in:
-            return
-        
-        try:
-            # Get tolerance settings
-            buy_tolerance = float(self.buy_exit_tolerance_var.get()) / 100
-            sell_tolerance = float(self.sell_exit_tolerance_var.get()) / 100
-            price_tick = float(self.exit_price_tick_var.get())
-            max_adjustment = float(self.max_exit_adjustment_var.get()) / 100
-            
-            # Get current LTP for all positions
-            symbols = []
-            for item in self.exit_positions_tree.get_children():
-                values = self.exit_positions_tree.item(item, 'values')
-                if values and len(values) > 1:
-                    symbols.append(values[1])
-            
-            if not symbols:
-                self.log_exit_message("No positions to calculate exit prices")
-                return
-            
-            # Get latest prices
-            try:
-                instruments = [f"MCX:{symbol}" for symbol in symbols]
-                ltp_data = self.kite.ltp(instruments)
-            except:
-                ltp_data = {}
-            
-            # Calculate exit prices for each position
-            for item in self.exit_positions_tree.get_children():
-                values = self.exit_positions_tree.item(item, 'values')
-                if not values or len(values) < 7:
-                    continue
-                
-                symbol = values[1]
-                quantity = int(values[2])
-                pos_type = values[6]
-                
-                # Get current LTP
-                current_price = 0
-                try:
-                    current_price = ltp_data.get(f"MCX:{symbol}", {}).get('last_price', 0)
-                except:
-                    # Try to get from previous value
-                    try:
-                        current_price = float(values[4]) if values[4] != 'N/A' else 0
-                    except:
-                        current_price = 0
-                
-                if current_price <= 0:
-                    self.exit_positions_tree.set(item, 'Exit Price', 'N/A')
-                    self.exit_positions_tree.set(item, 'Status', 'No Price')
-                    continue
-                
-                # Calculate exit price based on position type
-                exit_price = 0
-                exit_type = "LIMIT" if self.auto_limit_exit_var.get() else "MARKET"
-                
-                if pos_type == "LONG":
-                    # For LONG position, we need to SELL to exit
-                    # Use tolerance below current price for better chance of fill
-                    exit_price = current_price * (1 - sell_tolerance)
-                    # Apply max adjustment limit
-                    min_price = current_price * (1 - max_adjustment)
-                    exit_price = max(exit_price, min_price)
-                else:  # SHORT position
-                    # For SHORT position, we need to BUY to exit
-                    # Use tolerance above current price for better chance of fill
-                    exit_price = current_price * (1 + buy_tolerance)
-                    # Apply max adjustment limit
-                    max_price = current_price * (1 + max_adjustment)
-                    exit_price = min(exit_price, max_price)
-                
-                # Round to nearest price tick
-                if price_tick > 0:
-                    exit_price = round(exit_price / price_tick) * price_tick
-                
-                # Update tree
-                self.exit_positions_tree.set(item, 'Exit Price', f"{exit_price:.2f}")
-                self.exit_positions_tree.set(item, 'Exit Type', exit_type)
-                self.exit_positions_tree.set(item, 'Status', 'Calculated')
-                
-                # Update selection if exists
-                if symbol in self.selected_exit_positions:
-                    self.selected_exit_positions[symbol]['exit_price'] = exit_price
-                    self.selected_exit_positions[symbol]['exit_type'] = exit_type
-            
-            self.log_exit_message(f"Calculated exit prices for {len(symbols)} positions")
+            return limit_price
             
         except Exception as e:
-            self.log_exit_message(f"Error calculating exit prices: {e}")
+            self.log_message(f"Error calculating auto limit price: {e}")
+            return None
 
-    def exit_selected_positions(self):
-        """Exit selected positions with automatic limit prices"""
-        if not self.is_logged_in:
-            messagebox.showerror("Error", "Please login first")
-            return
+    def apply_limit_price_tolerance(self, symbol, current_price, transaction_type, user_price=0, option_type='CE'):
+        """
+        Apply tolerance to determine final limit price
         
-        if not self.selected_exit_positions:
-            messagebox.showwarning("Warning", "No positions selected for exit")
+        Args:
+            symbol: Trading symbol
+            current_price: Current market price
+            transaction_type: 'BUY' or 'SELL'
+            user_price: User-specified price (if any)
+            option_type: 'CE' or 'PE'
+        
+        Returns:
+            Final price to use
+        """
+        try:
+            # If user specified a price, use it
+            if user_price and user_price > 0:
+                return user_price
+            
+            # Calculate auto limit price
+            auto_price = self.calculate_auto_limit_price(current_price, transaction_type, option_type)
+            
+            if auto_price is not None:
+                # Log the auto price calculation
+                price_diff = auto_price - current_price
+                diff_percent = (price_diff / current_price) * 100
+                
+                log_msg = (f"Auto limit price for {symbol} ({option_type}): "
+                          f"Market: {current_price:.2f}, "
+                          f"Limit: {auto_price:.2f}, "
+                          f"Diff: {price_diff:+.2f} ({diff_percent:+.2f}%)")
+                
+                if option_type == 'CE':
+                    self.log_cepe_message(log_msg)
+                else:
+                    self.log_cepe_message(log_msg)
+                
+                return auto_price
+            
+            return None
+            
+        except Exception as e:
+            self.log_message(f"Error applying limit price tolerance: {e}")
+            return None
+
+
+    def setup_limit_settings_tab(self, notebook):
+            """Setup limit price settings tab for CE/PE options"""
+            limit_frame = ttk.Frame(notebook)
+            notebook.add(limit_frame, text="CE/PE Limit Settings")
+            
+            # Main frame with scrollbar
+            main_frame = ttk.Frame(limit_frame)
+            main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # CE Settings Frame
+            ce_frame = ttk.LabelFrame(main_frame, text="CALL OPTIONS (CE) Limit Settings")
+            ce_frame.pack(fill='x', padx=5, pady=5)
+            
+            # Enable/Disable Auto Limit
+            self.ce_auto_limit_var = tk.BooleanVar(value=self.ce_limit_settings['auto_limit_enabled'])
+            ce_auto_check = ttk.Checkbutton(ce_frame, text="Enable Automatic Limit Price", 
+                                        variable=self.ce_auto_limit_var)
+            ce_auto_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
+            
+            # BUY Tolerance
+            ttk.Label(ce_frame, text="BUY Tolerance (%):").grid(row=1, column=0, padx=5, pady=5, sticky='w')
+            self.ce_buy_tolerance_var = tk.StringVar(value=str(self.ce_limit_settings['buy_tolerance_percent']))
+            ce_buy_entry = ttk.Entry(ce_frame, textvariable=self.ce_buy_tolerance_var, width=10)
+            ce_buy_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+            ttk.Label(ce_frame, text="(Price below market for BUY orders)").grid(row=1, column=2, padx=5, pady=5, sticky='w')
+            
+            # SELL Tolerance
+            ttk.Label(ce_frame, text="SELL Tolerance (%):").grid(row=2, column=0, padx=5, pady=5, sticky='w')
+            self.ce_sell_tolerance_var = tk.StringVar(value=str(self.ce_limit_settings['sell_tolerance_percent']))
+            ce_sell_entry = ttk.Entry(ce_frame, textvariable=self.ce_sell_tolerance_var, width=10)
+            ce_sell_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
+            ttk.Label(ce_frame, text="(Price above market for SELL orders)").grid(row=2, column=2, padx=5, pady=5, sticky='w')
+            
+            # Min Price Tick
+            ttk.Label(ce_frame, text="Minimum Price Tick:").grid(row=3, column=0, padx=5, pady=5, sticky='w')
+            self.ce_min_tick_var = tk.StringVar(value=str(self.ce_limit_settings['min_price_tick']))
+            ce_min_tick_entry = ttk.Entry(ce_frame, textvariable=self.ce_min_tick_var, width=10)
+            ce_min_tick_entry.grid(row=3, column=1, padx=5, pady=5, sticky='w')
+            
+            # Max Price Adjustment
+            ttk.Label(ce_frame, text="Max Adjustment (%):").grid(row=4, column=0, padx=5, pady=5, sticky='w')
+            self.ce_max_adjust_var = tk.StringVar(value=str(self.ce_limit_settings['max_price_adjustment']))
+            ce_max_adjust_entry = ttk.Entry(ce_frame, textvariable=self.ce_max_adjust_var, width=10)
+            ce_max_adjust_entry.grid(row=4, column=1, padx=5, pady=5, sticky='w')
+            ttk.Label(ce_frame, text="(Maximum price adjustment allowed)").grid(row=4, column=2, padx=5, pady=5, sticky='w')
+            
+            # Market Order Fallback
+            self.ce_market_fallback_var = tk.BooleanVar(value=self.ce_limit_settings['use_market_order_fallback'])
+            ce_fallback_check = ttk.Checkbutton(ce_frame, text="Fallback to MARKET order if limit fails", 
+                                            variable=self.ce_market_fallback_var)
+            ce_fallback_check.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky='w')
+            
+            # PE Settings Frame
+            pe_frame = ttk.LabelFrame(main_frame, text="PUT OPTIONS (PE) Limit Settings")
+            pe_frame.pack(fill='x', padx=5, pady=10)
+            
+            # Enable/Disable Auto Limit
+            self.pe_auto_limit_var = tk.BooleanVar(value=self.pe_limit_settings['auto_limit_enabled'])
+            pe_auto_check = ttk.Checkbutton(pe_frame, text="Enable Automatic Limit Price", 
+                                        variable=self.pe_auto_limit_var)
+            pe_auto_check.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
+            
+            # BUY Tolerance
+            ttk.Label(pe_frame, text="BUY Tolerance (%):").grid(row=1, column=0, padx=5, pady=5, sticky='w')
+            self.pe_buy_tolerance_var = tk.StringVar(value=str(self.pe_limit_settings['buy_tolerance_percent']))
+            pe_buy_entry = ttk.Entry(pe_frame, textvariable=self.pe_buy_tolerance_var, width=10)
+            pe_buy_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+            ttk.Label(pe_frame, text="(Price below market for BUY orders)").grid(row=1, column=2, padx=5, pady=5, sticky='w')
+            
+            # SELL Tolerance
+            ttk.Label(pe_frame, text="SELL Tolerance (%):").grid(row=2, column=0, padx=5, pady=5, sticky='w')
+            self.pe_sell_tolerance_var = tk.StringVar(value=str(self.pe_limit_settings['sell_tolerance_percent']))
+            pe_sell_entry = ttk.Entry(pe_frame, textvariable=self.pe_sell_tolerance_var, width=10)
+            pe_sell_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
+            ttk.Label(pe_frame, text="(Price above market for SELL orders)").grid(row=2, column=2, padx=5, pady=5, sticky='w')
+            
+            # Min Price Tick
+            ttk.Label(pe_frame, text="Minimum Price Tick:").grid(row=3, column=0, padx=5, pady=5, sticky='w')
+            self.pe_min_tick_var = tk.StringVar(value=str(self.pe_limit_settings['min_price_tick']))
+            pe_min_tick_entry = ttk.Entry(pe_frame, textvariable=self.pe_min_tick_var, width=10)
+            pe_min_tick_entry.grid(row=3, column=1, padx=5, pady=5, sticky='w')
+            
+            # Max Price Adjustment
+            ttk.Label(pe_frame, text="Max Adjustment (%):").grid(row=4, column=0, padx=5, pady=5, sticky='w')
+            self.pe_max_adjust_var = tk.StringVar(value=str(self.pe_limit_settings['max_price_adjustment']))
+            pe_max_adjust_entry = ttk.Entry(pe_frame, textvariable=self.pe_max_adjust_var, width=10)
+            pe_max_adjust_entry.grid(row=4, column=1, padx=5, pady=5, sticky='w')
+            ttk.Label(pe_frame, text="(Maximum price adjustment allowed)").grid(row=4, column=2, padx=5, pady=5, sticky='w')
+            
+            # Market Order Fallback
+            self.pe_market_fallback_var = tk.BooleanVar(value=self.pe_limit_settings['use_market_order_fallback'])
+            pe_fallback_check = ttk.Checkbutton(pe_frame, text="Fallback to MARKET order if limit fails", 
+                                            variable=self.pe_market_fallback_var)
+            pe_fallback_check.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky='w')
+            
+            # Save Button
+            save_frame = ttk.Frame(main_frame)
+            save_frame.pack(fill='x', padx=5, pady=10)
+            
+            ttk.Button(save_frame, text="Save CE/PE Limit Settings", 
+                    command=self.save_ce_pe_limit_settings).pack(pady=5)
+            
+            # Test Calculation Frame
+            test_frame = ttk.LabelFrame(main_frame, text="Test Limit Price Calculation")
+            test_frame.pack(fill='x', padx=5, pady=5)
+            
+            ttk.Label(test_frame, text="Test Price:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
+            self.test_price_var = tk.StringVar(value="100.00")
+            test_price_entry = ttk.Entry(test_frame, textvariable=self.test_price_var, width=10)
+            test_price_entry.grid(row=0, column=1, padx=5, pady=5, sticky='w')
+            
+            ttk.Label(test_frame, text="Transaction:").grid(row=0, column=2, padx=5, pady=5, sticky='w')
+            self.test_transaction_var = tk.StringVar(value="BUY")
+            test_transaction_combo = ttk.Combobox(test_frame, textvariable=self.test_transaction_var, 
+                                                values=["BUY", "SELL"], width=8)
+            test_transaction_combo.grid(row=0, column=3, padx=5, pady=5, sticky='w')
+            
+            ttk.Label(test_frame, text="Option Type:").grid(row=0, column=4, padx=5, pady=5, sticky='w')
+            self.test_option_var = tk.StringVar(value="CE")
+            test_option_combo = ttk.Combobox(test_frame, textvariable=self.test_option_var, 
+                                        values=["CE", "PE"], width=8)
+            test_option_combo.grid(row=0, column=5, padx=5, pady=5, sticky='w')
+            
+            ttk.Button(test_frame, text="Test Calculation", 
+                    command=self.test_limit_calculation).grid(row=0, column=6, padx=5, pady=5)
+            
+            # Test Result Display
+            self.test_result_text = scrolledtext.ScrolledText(test_frame, height=5)
+            self.test_result_text.grid(row=1, column=0, columnspan=7, padx=5, pady=5, sticky='ew')
+            self.test_result_text.insert(tk.END, "Test results will appear here...")
+            
+            # Configure grid weights
+            test_frame.columnconfigure(6, weight=1)
+
+    def save_ce_pe_limit_settings(self):
+        """Save CE/PE limit settings from GUI"""
+        try:
+            # Save CE settings
+            self.ce_limit_settings['auto_limit_enabled'] = self.ce_auto_limit_var.get()
+            self.ce_limit_settings['buy_tolerance_percent'] = float(self.ce_buy_tolerance_var.get())
+            self.ce_limit_settings['sell_tolerance_percent'] = float(self.ce_sell_tolerance_var.get())
+            self.ce_limit_settings['min_price_tick'] = float(self.ce_min_tick_var.get())
+            self.ce_limit_settings['max_price_adjustment'] = float(self.ce_max_adjust_var.get())
+            self.ce_limit_settings['use_market_order_fallback'] = self.ce_market_fallback_var.get()
+            
+            # Save PE settings
+            self.pe_limit_settings['auto_limit_enabled'] = self.pe_auto_limit_var.get()
+            self.pe_limit_settings['buy_tolerance_percent'] = float(self.pe_buy_tolerance_var.get())
+            self.pe_limit_settings['sell_tolerance_percent'] = float(self.pe_sell_tolerance_var.get())
+            self.pe_limit_settings['min_price_tick'] = float(self.pe_min_tick_var.get())
+            self.pe_limit_settings['max_price_adjustment'] = float(self.pe_max_adjust_var.get())
+            self.pe_limit_settings['use_market_order_fallback'] = self.pe_market_fallback_var.get()
+            
+            messagebox.showinfo("Success", "CE/PE limit settings saved successfully!")
+            
+        except ValueError as e:
+            messagebox.showerror("Error", "Please enter valid numeric values")
+    
+    def test_limit_calculation(self):
+        """Test the limit price calculation"""
+        try:
+            price = float(self.test_price_var.get())
+            transaction = self.test_transaction_var.get()
+            option_type = self.test_option_var.get()
+            
+            # Get appropriate settings
+            if option_type == 'CE':
+                settings = self.ce_limit_settings
+                settings_name = "CE"
+            else:
+                settings = self.pe_limit_settings
+                settings_name = "PE"
+            
+            # Calculate limit price
+            limit_price = self.calculate_auto_limit_price(price, transaction, option_type)
+            
+            # Display results
+            self.test_result_text.delete(1.0, tk.END)
+            
+            if limit_price is not None:
+                price_diff = limit_price - price
+                diff_percent = (price_diff / price) * 100
+                
+                result_text = (
+                    f"=== {settings_name} Limit Price Calculation ===\n"
+                    f"Market Price: {price:.2f}\n"
+                    f"Transaction Type: {transaction}\n"
+                    f"Calculated Limit Price: {limit_price:.2f}\n"
+                    f"Price Difference: {price_diff:+.2f} ({diff_percent:+.2f}%)\n"
+                    f"\nSettings Used:\n"
+                    f"Auto Limit Enabled: {settings['auto_limit_enabled']}\n"
+                    f"Buy Tolerance: {settings['buy_tolerance_percent']}%\n"
+                    f"Sell Tolerance: {settings['sell_tolerance_percent']}%\n"
+                    f"Min Price Tick: {settings['min_price_tick']}\n"
+                    f"Max Adjustment: {settings['max_price_adjustment']}%\n"
+                    f"Market Fallback: {settings['use_market_order_fallback']}"
+                )
+            else:
+                result_text = (
+                    f"=== {settings_name} Limit Price Calculation ===\n"
+                    f"Market Price: {price:.2f}\n"
+                    f"Transaction Type: {transaction}\n"
+                    f"❌ Could not calculate limit price!\n"
+                    f"\nPossible reasons:\n"
+                    f"- Auto limit is disabled\n"
+                    f"- Invalid price input\n"
+                    f"- Calculation error"
+                )
+            
+            self.test_result_text.insert(tk.END, result_text)
+            
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid test price")
+        except Exception as e:
+            self.test_result_text.delete(1.0, tk.END)
+            self.test_result_text.insert(tk.END, f"Error in calculation: {str(e)}")
+
+    def update_ce_price_display_with_limit(self, price_labels, limit_labels, window, 
+                                          transaction, order_type, user_price):
+        """Update price labels with current prices and calculated limits for CE"""
+        if not window.winfo_exists():
             return
         
         try:
-            # Confirm with user
-            confirm = messagebox.askyesno(
-                "Confirm Exit",
-                f"Exit {len(self.selected_exit_positions)} selected positions?\n"
-                f"This will place limit orders at calculated prices."
-            )
-            
-            if not confirm:
-                return
-            
-            # Execute exits
-            successful = 0
-            failed = 0
-            
-            for symbol, position in self.selected_exit_positions.items():
-                try:
-                    quantity = position['quantity']
-                    exit_type = position['exit_type']
-                    exit_price = position['exit_price']
-                    pos_type = position['type']
+            for symbol, label in price_labels.items():
+                current_price = self.current_prices.get(symbol)
+                if current_price:
+                    label.config(text=f"₹{current_price:.2f}", foreground='blue')
                     
-                    # Determine transaction type
-                    if pos_type == "LONG":
-                        transaction = "SELL"
-                    else:  # SHORT
-                        transaction = "BUY"
-                    
-                    # Place order
-                    if exit_type == "MARKET" or exit_price <= 0:
-                        # Use market order
-                        order_id = self.kite.place_order(
-                            variety=self.kite.VARIETY_REGULAR,
-                            exchange="MCX",
-                            tradingsymbol=symbol,
-                            transaction_type=transaction,
-                            quantity=abs(quantity),
-                            order_type=self.kite.ORDER_TYPE_MARKET,
-                            product=self.kite.PRODUCT_NRML
+                    # Calculate and display limit price if LIMIT order
+                    if order_type == "LIMIT" and symbol in limit_labels:
+                        limit_price = self.apply_limit_price_tolerance(
+                            symbol, current_price, transaction, user_price, 'CE'
                         )
-                        self.log_exit_message(f"✅ Market Exit: {symbol} {transaction} {abs(quantity)} - ID: {order_id}")
-                    else:
-                        # Use limit order
-                        order_id = self.kite.place_order(
-                            variety=self.kite.VARIETY_REGULAR,
-                            exchange="MCX",
-                            tradingsymbol=symbol,
-                            transaction_type=transaction,
-                            quantity=abs(quantity),
-                            order_type=self.kite.ORDER_TYPE_LIMIT,
-                            product=self.kite.PRODUCT_NRML,
-                            price=exit_price
-                        )
-                        self.log_exit_message(f"✅ Limit Exit: {symbol} {transaction} {abs(quantity)} @ {exit_price:.2f} - ID: {order_id}")
-                    
-                    successful += 1
-                    
-                    # Update status in tree
-                    for item in self.exit_positions_tree.get_children():
-                        values = self.exit_positions_tree.item(item, 'values')
-                        if values and len(values) > 1 and values[1] == symbol:
-                            self.exit_positions_tree.set(item, 'Status', 'Exit Placed')
-                            break
-                    
-                    time.sleep(1)  # Delay between orders
-                    
-                except Exception as e:
-                    failed += 1
-                    self.log_exit_message(f"❌ Failed to exit {symbol}: {e}")
-                    
-                    # Try market order fallback if enabled
-                    if self.use_market_fallback_var.get() and exit_type == "LIMIT":
-                        try:
-                            order_id = self.kite.place_order(
-                                variety=self.kite.VARIETY_REGULAR,
-                                exchange="MCX",
-                                tradingsymbol=symbol,
-                                transaction_type=transaction,
-                                quantity=abs(quantity),
-                                order_type=self.kite.ORDER_TYPE_MARKET,
-                                product=self.kite.PRODUCT_NRML
-                            )
-                            self.log_exit_message(f"✅ Market Fallback Exit: {symbol} {transaction} {abs(quantity)} - ID: {order_id}")
-                            successful += 1
-                            failed -= 1
-                        except:
-                            pass
-            
-            # Show summary
-            messagebox.showinfo(
-                "Exit Summary",
-                f"Exit orders placed:\n"
-                f"Successful: {successful}\n"
-                f"Failed: {failed}"
-            )
-            
-            # Clear selection
-            self.selected_exit_positions.clear()
-            
-            # Refresh positions after some delay
-            self.root.after(5000, self.refresh_exit_positions)
-            
+                        
+                        if limit_price is not None:
+                            price_diff = limit_price - current_price
+                            diff_percent = (price_diff / current_price) * 100
+                            diff_color = 'green' if price_diff <= 0 else 'red'
+                            
+                            limit_text = f"Limit: ₹{limit_price:.2f} ({price_diff:+.2f}, {diff_percent:+.2f}%)"
+                            limit_labels[symbol].config(text=limit_text, foreground=diff_color)
+                        else:
+                            limit_labels[symbol].config(text="Auto limit disabled", foreground='gray')
+                else:
+                    label.config(text="Price unavailable", foreground='red')
+                    if symbol in limit_labels:
+                        limit_labels[symbol].config(text="N/A", foreground='red')
+                        
         except Exception as e:
-            self.log_exit_message(f"Error in exit_selected_positions: {e}")
+            print(f"Error updating CE price display: {e}")
+        
+        # Schedule next update
+        if window.winfo_exists():
+            window.after(1000, lambda: self.update_ce_price_display_with_limit(
+                price_labels, limit_labels, window, transaction, order_type, user_price))
+            
 
-    def exit_all_positions(self):
-        """Exit all open positions with automatic limit prices"""
-        if not self.is_logged_in:
-            messagebox.showerror("Error", "Please login first")
+    def update_ce_pe_together_price_display_with_limit(self, ce_price_labels, ce_limit_labels, 
+                                                      pe_price_labels, pe_limit_labels,
+                                                      window, transaction, order_type, user_price):
+        """Update price labels for CE/PE together with calculated limits"""
+        if not window.winfo_exists():
             return
         
         try:
-            # Select all positions
-            self.selected_exit_positions.clear()
-            for item in self.exit_positions_tree.get_children():
-                values = self.exit_positions_tree.item(item, 'values')
-                if values and len(values) > 1:
-                    symbol = values[1]
-                    self.exit_positions_tree.set(item, 'Select', '✓')
-                    self.selected_exit_positions[symbol] = {
-                        'symbol': symbol,
-                        'quantity': int(values[2]),
-                        'avg_price': float(values[3]),
-                        'ltp': float(values[4]) if values[4] != 'N/A' else 0,
-                        'type': values[6],
-                        'exit_price': float(values[7]) if values[7] not in ['Calc...', 'N/A'] else 0,
-                        'exit_type': values[8]
-                    }
+            # Update CE prices and limits
+            for symbol, label in ce_price_labels.items():
+                current_price = self.current_prices.get(symbol)
+                if current_price:
+                    label.config(text=f"₹{current_price:.2f}", foreground='green')
+                    
+                    # Calculate and display limit price if LIMIT order
+                    if order_type == "LIMIT" and symbol in ce_limit_labels:
+                        limit_price = self.apply_limit_price_tolerance(
+                            symbol, current_price, transaction, user_price, 'CE'
+                        )
+                        
+                        if limit_price is not None:
+                            price_diff = limit_price - current_price
+                            diff_percent = (price_diff / current_price) * 100
+                            diff_color = 'green' if price_diff <= 0 else 'red'
+                            
+                            limit_text = f"→ ₹{limit_price:.2f} ({price_diff:+.2f})"
+                            ce_limit_labels[symbol].config(text=limit_text, foreground=diff_color,
+                                                         font=('Arial', 9, 'bold'))
+                        else:
+                            ce_limit_labels[symbol].config(text="Auto limit off", foreground='gray')
+                else:
+                    label.config(text="Price unavailable", foreground='red')
+                    if symbol in ce_limit_labels:
+                        ce_limit_labels[symbol].config(text="N/A", foreground='red')
             
-            if not self.selected_exit_positions:
-                messagebox.showinfo("Info", "No positions to exit")
-                return
-            
-            # Exit selected positions
-            self.exit_selected_positions()
-            
+            # Update PE prices and limits
+            for symbol, label in pe_price_labels.items():
+                current_price = self.current_prices.get(symbol)
+                if current_price:
+                    label.config(text=f"₹{current_price:.2f}", foreground='red')
+                    
+                    # Calculate and display limit price if LIMIT order
+                    if order_type == "LIMIT" and symbol in pe_limit_labels:
+                        limit_price = self.apply_limit_price_tolerance(
+                            symbol, current_price, transaction, user_price, 'PE'
+                        )
+                        
+                        if limit_price is not None:
+                            price_diff = limit_price - current_price
+                            diff_percent = (price_diff / current_price) * 100
+                            diff_color = 'green' if price_diff <= 0 else 'red'
+                            
+                            limit_text = f"→ ₹{limit_price:.2f} ({price_diff:+.2f})"
+                            pe_limit_labels[symbol].config(text=limit_text, foreground=diff_color,
+                                                         font=('Arial', 9, 'bold'))
+                        else:
+                            pe_limit_labels[symbol].config(text="Auto limit off", foreground='gray')
+                else:
+                    label.config(text="Price unavailable", foreground='red')
+                    if symbol in pe_limit_labels:
+                        pe_limit_labels[symbol].config(text="N/A", foreground='red')
+                        
         except Exception as e:
-            self.log_exit_message(f"Error in exit_all_positions: {e}")
-
-    def log_exit_message(self, message):
-        """Thread-safe logging for exit operations"""
-        def update_log():
-            try:
-                timestamp = datetime.now().strftime("%H:%M:%S")
-                self.exit_status_text.insert(tk.END, f"[{timestamp}] {message}\n")
-                self.exit_status_text.see(tk.END)
-            except Exception as e:
-                print(f"Exit log error: {e}")
+            print(f"Error updating CE/PE together price display: {e}")
         
-        try:
-            if self.root.winfo_exists():
-                self.root.after(0, update_log)
-        except:
-            pass
+        # Schedule next update
+        if window.winfo_exists():
+            window.after(1000, lambda: self.update_ce_pe_together_price_display_with_limit(
+                ce_price_labels, ce_limit_labels, pe_price_labels, pe_limit_labels,
+                window, transaction, order_type, user_price))
 
-    # Add this method to update positions for exit tab periodically
-    def update_exit_positions_loop(self):
-        """Periodically update exit positions"""
-        while self.is_logged_in:
-            try:
-                # Only refresh if the tab is active (simplified - refresh every 30 seconds)
-                time.sleep(30)
-                if hasattr(self, 'exit_positions_tree'):
-                    self.root.after(0, self.refresh_exit_positions)
-            except Exception as e:
-                self.log_exit_message(f"Error in exit positions loop: {e}")
-                time.sleep(60)
 
 def main():
     """Main entry point for the application"""
