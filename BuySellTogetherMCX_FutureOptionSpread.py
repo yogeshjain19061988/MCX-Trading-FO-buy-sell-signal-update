@@ -40,6 +40,13 @@ class ZerodhaTradingApp:
         self.current_prices = {}
         self.real_time_windows = []
         
+        # Trailing profit variables (NEW)
+        self.trailing_enabled = False
+        self.trailing_activation = 0        # profit amount to activate trailing
+        self.trailing_type = "points"       # "points" or "percentage"
+        self.trailing_value = 0
+        self.trailing_positions = {}        # dict: symbol -> {"peak_pnl": float, "activated": bool}
+        
         # Load credentials
         self.load_credentials()
         
@@ -2924,6 +2931,30 @@ class ZerodhaTradingApp:
         ttk.Button(profit_target_frame, text="Auto Exit All", 
                   command=self.auto_exit_positions).pack(side='left', padx=5)
         
+        # NEW: Trailing Profit frame
+        trailing_frame = ttk.LabelFrame(summary_frame, text="Trailing Profit")
+        trailing_frame.pack(fill='x', pady=5)
+        
+        self.trailing_enabled_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(trailing_frame, text="Enable Trailing Profit", 
+                        variable=self.trailing_enabled_var, 
+                        command=self.toggle_trailing).pack(side='left', padx=5)
+        
+        ttk.Label(trailing_frame, text="Activation Profit: ₹").pack(side='left', padx=5)
+        self.trailing_activation_entry = ttk.Entry(trailing_frame, width=10)
+        self.trailing_activation_entry.pack(side='left', padx=5)
+        self.trailing_activation_entry.insert(0, "500")
+        
+        ttk.Label(trailing_frame, text="Trail Type:").pack(side='left', padx=5)
+        self.trailing_type_combo = ttk.Combobox(trailing_frame, values=["points", "percentage"], width=10)
+        self.trailing_type_combo.pack(side='left', padx=5)
+        self.trailing_type_combo.set("points")
+        
+        ttk.Label(trailing_frame, text="Trail Value:").pack(side='left', padx=5)
+        self.trailing_value_entry = ttk.Entry(trailing_frame, width=10)
+        self.trailing_value_entry.pack(side='left', padx=5)
+        self.trailing_value_entry.insert(0, "200")
+        
         # P&L History
         history_frame = ttk.LabelFrame(pnl_frame, text="P&L History")
         history_frame.pack(fill='both', expand=True, padx=10, pady=10)
@@ -2938,15 +2969,35 @@ class ZerodhaTradingApp:
         
         self.pnl_tree.pack(fill='both', expand=True, padx=10, pady=10)
     
+    # NEW: Toggle trailing profit
+    def toggle_trailing(self):
+        self.trailing_enabled = self.trailing_enabled_var.get()
+        if self.trailing_enabled:
+            self.log_message("Trailing profit enabled")
+        else:
+            self.log_message("Trailing profit disabled")
+            self.trailing_positions.clear()  # Reset tracking
+    
+    # NEW: Update trailing profit settings from UI
+    def update_trailing_settings(self):
+        try:
+            self.trailing_activation = float(self.trailing_activation_entry.get())
+            self.trailing_type = self.trailing_type_combo.get()
+            self.trailing_value = float(self.trailing_value_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Invalid trailing profit values")
+            return False
+        return True
+    
     def start_background_tasks(self):
         """Start background data fetching tasks"""
         # Start position updates
         threading.Thread(target=self.update_positions_loop, daemon=True).start()
         
-        # Start P&L updates
+        # Start P&L updates (which also handles profit target and trailing)
         threading.Thread(target=self.update_pnl_loop, daemon=True).start()
         
-        # Start profit target monitoring
+        # Start profit target monitoring (now integrated into update_pnl_loop, but keep separate for clarity)
         threading.Thread(target=self.monitor_profit_target, daemon=True).start()
         
         # Auto-refresh tables after login
@@ -2995,10 +3046,11 @@ class ZerodhaTradingApp:
             self.log_message(f"Error refreshing positions: {e}")
     
     def update_pnl_loop(self):
-        """Continuously update P&L"""
+        """Continuously update P&L and check trailing profit"""
         while self.is_logged_in:
             try:
                 self.update_pnl()
+                self.check_trailing_profit()  # NEW: check trailing conditions
                 time.sleep(10)  # Update every 10 seconds
             except Exception as e:
                 self.log_message(f"Error updating P&L: {e}")
@@ -3063,6 +3115,95 @@ class ZerodhaTradingApp:
                 self.log_message(f"Error monitoring profit target: {e}")
                 time.sleep(30)
     
+    # NEW: Trailing profit check
+    def check_trailing_profit(self):
+        """Check each open position for trailing profit conditions"""
+        if not self.is_logged_in or not self.trailing_enabled:
+            return
+        
+        # Get trailing settings from UI
+        if not self.update_trailing_settings():
+            return
+        
+        try:
+            positions = self.kite.positions()
+            net_positions = positions['net']
+            
+            # Get current symbols in positions
+            current_symbols = {p['tradingsymbol'] for p in net_positions if p['quantity'] != 0}
+            
+            # Remove symbols that are no longer in positions from tracking
+            for symbol in list(self.trailing_positions.keys()):
+                if symbol not in current_symbols:
+                    del self.trailing_positions[symbol]
+            
+            for position in net_positions:
+                if position['quantity'] == 0:
+                    continue
+                
+                symbol = position['tradingsymbol']
+                pnl = position['pnl']  # Unrealized P&L
+                
+                # Initialize tracking for this symbol if not present
+                if symbol not in self.trailing_positions:
+                    self.trailing_positions[symbol] = {
+                        'peak_pnl': pnl,
+                        'activated': False
+                    }
+                
+                track = self.trailing_positions[symbol]
+                
+                # Check if trailing should be activated
+                if not track['activated']:
+                    if pnl >= self.trailing_activation:
+                        track['activated'] = True
+                        track['peak_pnl'] = pnl
+                        self.log_message(f"Trailing activated for {symbol} at P&L ₹{pnl:.2f}")
+                else:
+                    # Update peak if P&L increased
+                    if pnl > track['peak_pnl']:
+                        track['peak_pnl'] = pnl
+                    
+                    # Check if profit has retraced by trail amount
+                    if self.trailing_type == "points":
+                        if pnl <= track['peak_pnl'] - self.trailing_value:
+                            self.log_message(f"Trailing stop triggered for {symbol}: peak ₹{track['peak_pnl']:.2f}, current ₹{pnl:.2f}")
+                            self.exit_position(position)
+                    else:  # percentage
+                        threshold = track['peak_pnl'] * (1 - self.trailing_value / 100)
+                        if pnl <= threshold:
+                            self.log_message(f"Trailing stop triggered for {symbol}: peak ₹{track['peak_pnl']:.2f}, current ₹{pnl:.2f}")
+                            self.exit_position(position)
+        
+        except Exception as e:
+            self.log_message(f"Error in trailing profit check: {e}")
+    
+    # NEW: Exit a single position (used by trailing)
+    def exit_position(self, position):
+        """Exit a single position with market order"""
+        try:
+            transaction = 'SELL' if position['quantity'] > 0 else 'BUY'
+            quantity = abs(position['quantity'])
+            
+            order_id = self.kite.place_order(
+                variety=self.kite.VARIETY_REGULAR,
+                exchange=position['exchange'],
+                tradingsymbol=position['tradingsymbol'],
+                transaction_type=transaction,
+                quantity=quantity,
+                order_type=self.kite.ORDER_TYPE_MARKET,
+                product=self.kite.PRODUCT_NRML
+            )
+            
+            self.log_message(f"Trailing exit: {position['tradingsymbol']} {transaction} {quantity} - Order ID: {order_id}")
+            
+            # Remove from tracking after exit
+            if position['tradingsymbol'] in self.trailing_positions:
+                del self.trailing_positions[position['tradingsymbol']]
+                
+        except Exception as e:
+            self.log_message(f"Error exiting position {position['tradingsymbol']}: {e}")
+    
     def auto_exit_positions(self):
         """Auto exit all positions"""
         if not self.is_logged_in:
@@ -3089,6 +3230,10 @@ class ZerodhaTradingApp:
                     
                     orders_placed += 1
                     self.log_message(f"Auto exit: {position['tradingsymbol']} {transaction} {quantity} - Order ID: {order_id}")
+                    
+                    # Remove from trailing tracking
+                    if position['tradingsymbol'] in self.trailing_positions:
+                        del self.trailing_positions[position['tradingsymbol']]
             
             if orders_placed > 0:
                 self.log_message(f"Auto exit completed for {orders_placed} positions")
